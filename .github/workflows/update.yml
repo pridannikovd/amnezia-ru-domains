@@ -1,0 +1,34 @@
+name: Update Amnezia domain subscription
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: domain-feed
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download already-built public list
+        run: >-
+          curl --fail --silent --show-error --location
+          --proto '=https' --proto-redir '=https'
+          --connect-timeout 15 --max-time 60 --max-filesize 5242880
+          https://raw.githubusercontent.com/lib4u/amnezia-tunneling-ru/main/amnezia.json
+          --output /tmp/amnezia.json
+      - name: Convert to one-domain-per-line text
+        run: python3 convert.py /tmp/amnezia.json domains.txt
+      - name: Commit only the public domain list
+        run: |
+          git add domains.txt
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Update public Amnezia domain feed'
+            git push
+          fi
